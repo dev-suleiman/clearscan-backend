@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: clearscan-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: MODEL_DIR
+        value: /model_files
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: LOG_LEVEL
+        value: INFO
+    disk:
+      name: model-files
+      mountPath: /model_files
+      sizeGB: 1
