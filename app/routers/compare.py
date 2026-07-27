@@ -16,7 +16,6 @@ from app.schemas.responses import ComparisonResponse
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
 def _decode_upload(file: UploadFile, contents: bytes) -> np.ndarray:
     ext = Path(file.filename or "").suffix.lower()
     if ext not in settings.ALLOWED_EXTENSIONS:
@@ -35,7 +34,6 @@ def _decode_upload(file: UploadFile, contents: bytes) -> np.ndarray:
         raise HTTPException(status_code=422, detail="Could not decode image")
     return image
 
-
 @router.post("/compare", response_model=ComparisonResponse)
 async def compare(file: UploadFile = File(...)):
     contents = await file.read()
@@ -44,7 +42,6 @@ async def compare(file: UploadFile = File(...)):
 
     clahe_output = enhance_clahe(image)
     fallback_reason: str | None = None
-
     try:
         cnn_output = enhancer.enhance(image)
     except HTTPException as exc:

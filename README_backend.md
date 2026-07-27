@@ -141,7 +141,7 @@ cp ../clearscan-models/models/saved/enhancement_autoencoder.keras model_files/
 6. Add a **Persistent Disk**: mount path `/model_files`, size 1 GB.
 7. Click **Create Web Service** and wait for the build (~5 minutes).
 8. Once live, upload model files via the Render Shell tab.
-9. Your deployment URL will be `https://clearscan-api.onrender.com`.
+9. Your deployment URL will be `http://13.49.30.153:8000`.
 
 ---
 

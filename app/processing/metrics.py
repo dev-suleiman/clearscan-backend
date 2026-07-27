@@ -5,7 +5,6 @@ from skimage.restoration import estimate_sigma
 
 from app.schemas.responses import MetricsDict
 
-
 def compute_metrics(image: np.ndarray) -> dict:
     """Compute IQA metrics. Accepts float [0,1] or uint8 [0,255] grayscale."""
     if image.dtype == np.uint8:

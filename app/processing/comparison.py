@@ -1,8 +1,6 @@
 import numpy as np
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
-
 from app.processing.clahe import image_to_base64
-
 
 def _brisque_score(image: np.ndarray) -> float:
     try:
@@ -10,8 +8,6 @@ def _brisque_score(image: np.ndarray) -> float:
         return float(BRISQUE().score(image))
     except Exception:
         return -1.0
-
-
 def _composite(ssim: float, psnr: float, brisque: float) -> float:
     if brisque < 0:
         return 0.4 * ssim + 0.4 * (min(psnr, 50.0) / 50.0)
@@ -20,8 +16,6 @@ def _composite(ssim: float, psnr: float, brisque: float) -> float:
         + 0.4 * (min(psnr, 50.0) / 50.0)
         + 0.2 * (1.0 - max(0.0, min(brisque, 100.0)) / 100.0)
     )
-
-
 def compare_enhancements(
     original: np.ndarray,
     clahe_output: np.ndarray,

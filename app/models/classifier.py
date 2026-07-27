@@ -3,14 +3,11 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import HTTPException
-
 from app.config import settings
 from app.processing.metrics import compute_metrics
-
 logger = logging.getLogger(__name__)
 
 CLASS_NAMES = ["Good", "Fair", "Poor"]
-
 
 def _defects_from_class(quality_class: str, image: np.ndarray) -> list[str]:
     if quality_class == "Good":
@@ -22,8 +19,6 @@ def _defects_from_class(quality_class: str, image: np.ndarray) -> list[str]:
     m = compute_metrics(image)
     defects = m["defects"]
     return defects[:1] if defects else []
-
-
 class QualityClassifier:
     def __init__(self):
         self.model = None
@@ -50,7 +45,6 @@ class QualityClassifier:
         probs = self.model.predict(batch, verbose=0)[0]
         idx = int(np.argmax(probs))
         quality_class = CLASS_NAMES[idx]
-
         return {
             "quality_class": quality_class,
             "confidence": float(probs[idx]),
@@ -59,8 +53,5 @@ class QualityClassifier:
                 "Fair": float(probs[1]),
                 "Poor": float(probs[2]),
             },
-            "defects": _defects_from_class(quality_class, image),
-        }
-
-
+            "defects": _defects_from_class(quality_class, image),}
 classifier = QualityClassifier()
