@@ -4,9 +4,12 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.auth import get_current_user
+from app.database import ScanSession, User, get_db
 from app.models.enhancer import enhancer
 from app.processing.clahe import enhance_clahe, image_to_base64
 from app.processing.comparison import compare_enhancements
@@ -35,7 +38,7 @@ def _decode_upload(file: UploadFile, contents: bytes) -> np.ndarray:
     return image
 
 @router.post("/compare", response_model=ComparisonResponse)
-async def compare(file: UploadFile = File(...)):
+async def compare(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     image = _decode_upload(file, contents)
     start = time.perf_counter()
@@ -59,7 +62,7 @@ async def compare(file: UploadFile = File(...)):
     clahe_b64 = image_to_base64(clahe_output)
     cnn_b64 = image_to_base64(cnn_output) if fallback_reason is None else clahe_b64
 
-    return ComparisonResponse(
+    response = ComparisonResponse(
         winner=winner,
         winning_image_b64=result["winning_image_b64"] if not fallback_reason else clahe_b64,
         clahe_result={
@@ -74,3 +77,6 @@ async def compare(file: UploadFile = File(...)):
         processing_time_ms=round(elapsed_ms, 2),
         fallback_reason=fallback_reason,
     )
+    db.add(ScanSession(user_id=user.id, enhancement_method=winner, mode="compare"))
+    db.commit()
+    return response

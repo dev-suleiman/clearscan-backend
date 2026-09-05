@@ -7,6 +7,10 @@ class MetricsDict(BaseModel):
     shannon_entropy: float
     histogram_spread: float
     noise_variance: float
+    # Reference-based metrics (enhanced vs. original). Not meaningful for a
+    # standalone "before" reading, so left unset there.
+    ssim: float | None = None
+    psnr: float | None = None
 
 
 class QualityAssessmentResponse(BaseModel):

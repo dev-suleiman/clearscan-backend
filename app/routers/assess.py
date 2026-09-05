@@ -4,9 +4,12 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.auth import get_current_user
+from app.database import ScanSession, User, get_db
 from app.models.classifier import classifier
 from app.processing.metrics import compute_metrics, image_quality_to_metrics_dict
 from app.schemas.responses import QualityAssessmentResponse
@@ -31,7 +34,7 @@ def _validate_upload(file: UploadFile, contents: bytes) -> None:
 
 
 @router.post("/assess", response_model=QualityAssessmentResponse)
-async def assess(file: UploadFile = File(...)):
+async def assess(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     _validate_upload(file, contents)
 
@@ -70,6 +73,8 @@ async def assess(file: UploadFile = File(...)):
         processing_time_ms=round(elapsed_ms, 2),
         mode=mode,
     )
+    db.add(ScanSession(user_id=user.id, quality_class=response.quality_class, mode=mode))
+    db.commit()
     logger.info(
         "assess | class=%s mode=%s time=%.1fms",
         response.quality_class,

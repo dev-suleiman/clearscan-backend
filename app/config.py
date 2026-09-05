@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: list[str] = [".png", ".jpg", ".jpeg"]
     CORS_ORIGINS: str = "*"
     LOG_LEVEL: str = "INFO"
+    DATABASE_URL: str = "sqlite:///./clearscan.db"
+    JWT_SECRET: str = "change-this-secret-in-production"
+    JWT_EXPIRE_DAYS: int = 7
 
     @property
     def cors_origins_list(self) -> list[str]:

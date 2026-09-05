@@ -10,7 +10,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.config import settings
 from app.models.classifier import classifier
 from app.models.enhancer import enhancer
-from app.routers import assess, compare, enhance, health
+from app.database import init_db
+from app.routers import admin, assess, auth, compare, enhance, health
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -36,6 +37,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()
     logger.info(
         "ClearScan API starting - classifier_loaded=%s  enhancer_loaded=%s",
         classifier.model is not None,
@@ -45,6 +47,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ClearScan API", version="1.0.0", lifespan=lifespan)
+init_db()
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,6 +68,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 app.include_router(assess.router, prefix="/api/v1")
 app.include_router(enhance.router, prefix="/api/v1")
 app.include_router(compare.router, prefix="/api/v1")

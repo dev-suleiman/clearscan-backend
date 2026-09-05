@@ -4,11 +4,15 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.auth import get_current_user
+from app.database import ScanSession, User, get_db
 from app.models.enhancer import enhancer
 from app.processing.clahe import enhance_clahe, image_to_base64
+from app.processing.comparison import reference_metrics
 from app.processing.metrics import compute_metrics, image_quality_to_metrics_dict
 from app.schemas.responses import EnhancementResponse
 
@@ -36,7 +40,7 @@ def _decode_upload(file: UploadFile, contents: bytes) -> np.ndarray:
 
 
 @router.post("/enhance/clahe", response_model=EnhancementResponse)
-async def enhance_clahe_endpoint(file: UploadFile = File(...)):
+async def enhance_clahe_endpoint(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     image = _decode_upload(file, contents)
     start = time.perf_counter()
@@ -44,19 +48,25 @@ async def enhance_clahe_endpoint(file: UploadFile = File(...)):
     before_metrics = compute_metrics(image)
     enhanced = enhance_clahe(image)
     after_metrics = compute_metrics(enhanced)
+    ref = reference_metrics(image, enhanced)
     elapsed_ms = (time.perf_counter() - start) * 1000
 
-    return EnhancementResponse(
+    response = EnhancementResponse(
         enhanced_image_b64=image_to_base64(enhanced),
         method="clahe",
         before_metrics=image_quality_to_metrics_dict(before_metrics),
-        after_metrics=image_quality_to_metrics_dict(after_metrics),
+        after_metrics=image_quality_to_metrics_dict(
+            after_metrics, ssim=ref["ssim"], psnr=ref["psnr"]
+        ),
         processing_time_ms=round(elapsed_ms, 2),
     )
+    db.add(ScanSession(user_id=user.id, enhancement_method="clahe", mode="offline"))
+    db.commit()
+    return response
 
 
 @router.post("/enhance/cnn", response_model=EnhancementResponse)
-async def enhance_cnn_endpoint(file: UploadFile = File(...)):
+async def enhance_cnn_endpoint(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     image = _decode_upload(file, contents)
     start = time.perf_counter()
@@ -72,12 +82,18 @@ async def enhance_cnn_endpoint(file: UploadFile = File(...)):
             )
         raise
     after_metrics = compute_metrics(enhanced)
+    ref = reference_metrics(image, enhanced)
     elapsed_ms = (time.perf_counter() - start) * 1000
 
-    return EnhancementResponse(
+    response = EnhancementResponse(
         enhanced_image_b64=image_to_base64(enhanced),
         method="cnn",
         before_metrics=image_quality_to_metrics_dict(before_metrics),
-        after_metrics=image_quality_to_metrics_dict(after_metrics),
+        after_metrics=image_quality_to_metrics_dict(
+            after_metrics, ssim=ref["ssim"], psnr=ref["psnr"]
+        ),
         processing_time_ms=round(elapsed_ms, 2),
     )
+    db.add(ScanSession(user_id=user.id, enhancement_method="cnn", mode="cnn"))
+    db.commit()
+    return response

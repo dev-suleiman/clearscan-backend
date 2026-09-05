@@ -1,21 +1,20 @@
+import cv2
 import numpy as np
 from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 from app.processing.clahe import image_to_base64
 
-def _brisque_score(image: np.ndarray) -> float:
-    try:
-        from brisque import BRISQUE
-        return float(BRISQUE().score(image))
-    except Exception:
-        return -1.0
-def _composite(ssim: float, psnr: float, brisque: float) -> float:
-    if brisque < 0:
-        return 0.4 * ssim + 0.4 * (min(psnr, 50.0) / 50.0)
-    return (
-        0.4 * ssim
-        + 0.4 * (min(psnr, 50.0) / 50.0)
-        + 0.2 * (1.0 - max(0.0, min(brisque, 100.0)) / 100.0)
-    )
+
+def _composite(ssim: float, psnr: float) -> float:
+    return 0.5 * ssim + 0.5 * (min(psnr, 50.0) / 50.0)
+
+
+def reference_metrics(original: np.ndarray, output: np.ndarray) -> dict:
+    """Return SSIM and PSNR for the enhanced output compared with the original."""
+    ssim = float(structural_similarity(original, output, data_range=255))
+    psnr = float(peak_signal_noise_ratio(original, output, data_range=255))
+    return {"ssim": ssim, "psnr": psnr}
+
+
 def compare_enhancements(
     original: np.ndarray,
     clahe_output: np.ndarray,
@@ -23,16 +22,9 @@ def compare_enhancements(
 ) -> dict:
     results = {}
     for name, output in [("clahe", clahe_output), ("cnn", cnn_output)]:
-        ssim = float(structural_similarity(original, output, data_range=255))
-        psnr = float(peak_signal_noise_ratio(original, output, data_range=255))
-        brisque = _brisque_score(output)
-        comp = _composite(ssim, psnr, brisque)
-        results[name] = {
-            "ssim": ssim,
-            "psnr": psnr,
-            "brisque": brisque,
-            "composite": comp,
-        }
+        m = reference_metrics(original, output)
+        comp = _composite(m["ssim"], m["psnr"])
+        results[name] = {**m, "composite": comp}
 
     winner = "cnn" if results["cnn"]["composite"] >= results["clahe"]["composite"] else "clahe"
     winning_img = cnn_output if winner == "cnn" else clahe_output

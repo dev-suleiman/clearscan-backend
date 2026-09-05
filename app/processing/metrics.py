@@ -58,11 +58,17 @@ def compute_metrics(image: np.ndarray) -> dict:
     }
 
 
-def image_quality_to_metrics_dict(metrics: dict) -> MetricsDict:
+def image_quality_to_metrics_dict(
+    metrics: dict,
+    ssim: float | None = None,
+    psnr: float | None = None,
+) -> MetricsDict:
     return MetricsDict(
         laplacian_variance=metrics["laplacian_variance"],
         rms_contrast=metrics["rms_contrast"],
         shannon_entropy=metrics["shannon_entropy"],
         histogram_spread=metrics["histogram_spread"],
         noise_variance=metrics["noise_variance"],
+        ssim=ssim,
+        psnr=psnr,
     )
