@@ -21,6 +21,8 @@ class QualityAssessmentResponse(BaseModel):
     metrics: MetricsDict
     processing_time_ms: float
     mode: str
+    session_id: int | None = None
+    image_url: str | None = None
 
 
 class EnhancementResponse(BaseModel):
@@ -30,6 +32,9 @@ class EnhancementResponse(BaseModel):
     after_metrics: MetricsDict
     processing_time_ms: float
 
+    session_id: int | None = None
+    original_image_url: str | None = None
+    enhanced_image_url: str | None = None
 
 class ComparisonResponse(BaseModel):
     winner: str

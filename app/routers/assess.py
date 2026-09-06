@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.auth import get_current_user
 from app.database import ScanSession, User, get_db
+from app.storage import storage
 from app.models.classifier import classifier
 from app.processing.metrics import compute_metrics, image_quality_to_metrics_dict
 from app.schemas.responses import QualityAssessmentResponse
@@ -73,8 +74,19 @@ async def assess(file: UploadFile = File(...), user: User = Depends(get_current_
         processing_time_ms=round(elapsed_ms, 2),
         mode=mode,
     )
-    db.add(ScanSession(user_id=user.id, quality_class=response.quality_class, mode=mode))
+    session = ScanSession(user_id=user.id, quality_class=response.quality_class, mode=mode)
+    db.add(session)
     db.commit()
+    db.refresh(session)
+
+    image_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    session.image_path = image_path
+    db.commit()
+
+    response.session_id = session.id
+    if image_path:
+        response.image_url = storage.get_signed_url(image_path)
+
     logger.info(
         "assess | class=%s mode=%s time=%.1fms",
         response.quality_class,

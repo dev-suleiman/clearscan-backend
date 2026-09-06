@@ -11,8 +11,7 @@ from app.config import settings
 from app.models.classifier import classifier
 from app.models.enhancer import enhancer
 from app.database import init_db
-from app.routers import admin, assess, auth, compare, enhance, health
-
+from app.routers import admin, assess, auth, compare, enhance, health, history
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
@@ -70,6 +69,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
+app.include_router(history.router, prefix="/api/v1")
 app.include_router(assess.router, prefix="/api/v1")
 app.include_router(enhance.router, prefix="/api/v1")
 app.include_router(compare.router, prefix="/api/v1")

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 from app.config import settings
@@ -33,6 +33,8 @@ class ScanSession(Base):
     quality_class: Mapped[str | None] = mapped_column(String(32), nullable=True)
     enhancement_method: Mapped[str | None] = mapped_column(String(32), nullable=True)
     mode: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    enhanced_image_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     user: Mapped[User] = relationship(back_populates="sessions")
 
@@ -47,6 +49,12 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    columns = {column["name"] for column in inspect(engine).get_columns("sessions")}
+    with engine.begin() as connection:
+        if "image_path" not in columns:
+            connection.execute(text("ALTER TABLE sessions ADD COLUMN image_path VARCHAR(512)"))
+        if "enhanced_image_path" not in columns:
+            connection.execute(text("ALTER TABLE sessions ADD COLUMN enhanced_image_path VARCHAR(512)"))
 
 
 def get_db():

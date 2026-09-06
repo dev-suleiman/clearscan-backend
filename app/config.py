@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-this-secret-in-production"
     JWT_EXPIRE_DAYS: int = 7
 
+    # S3-compatible storage (Neon)
+    AWS_ENDPOINT_URL_S3: str = ""
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "us-east-2"
+    AWS_BUCKET_NAME: str = "assets"
+    S3_ENABLED: bool = False
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]

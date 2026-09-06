@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.auth import get_current_user
 from app.database import ScanSession, User, get_db
+from app.storage import storage
 from app.models.enhancer import enhancer
 from app.processing.clahe import enhance_clahe, image_to_base64
 from app.processing.comparison import reference_metrics
@@ -60,8 +61,24 @@ async def enhance_clahe_endpoint(file: UploadFile = File(...), user: User = Depe
         ),
         processing_time_ms=round(elapsed_ms, 2),
     )
-    db.add(ScanSession(user_id=user.id, enhancement_method="clahe", mode="offline"))
+    session = ScanSession(user_id=user.id, enhancement_method="clahe", mode="offline")
+    db.add(session)
     db.commit()
+    db.refresh(session)
+
+    _, enhanced_bytes = cv2.imencode(".png", enhanced)
+    original_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    session.image_path = original_path
+    session.enhanced_image_path = enhanced_path
+    db.commit()
+
+    response.session_id = session.id
+    if original_path:
+        response.original_image_url = storage.get_signed_url(original_path)
+    if enhanced_path:
+        response.enhanced_image_url = storage.get_signed_url(enhanced_path)
+    
     return response
 
 
@@ -94,6 +111,22 @@ async def enhance_cnn_endpoint(file: UploadFile = File(...), user: User = Depend
         ),
         processing_time_ms=round(elapsed_ms, 2),
     )
-    db.add(ScanSession(user_id=user.id, enhancement_method="cnn", mode="cnn"))
+    session = ScanSession(user_id=user.id, enhancement_method="cnn", mode="cnn")
+    db.add(session)
     db.commit()
+    db.refresh(session)
+
+    _, enhanced_bytes = cv2.imencode(".png", enhanced)
+    original_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    session.image_path = original_path
+    session.enhanced_image_path = enhanced_path
+    db.commit()
+
+    response.session_id = session.id
+    if original_path:
+        response.original_image_url = storage.get_signed_url(original_path)
+    if enhanced_path:
+        response.enhanced_image_url = storage.get_signed_url(enhanced_path)
+    
     return response

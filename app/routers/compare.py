@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.auth import get_current_user
 from app.database import ScanSession, User, get_db
+from app.storage import storage
 from app.models.enhancer import enhancer
 from app.processing.clahe import enhance_clahe, image_to_base64
 from app.processing.comparison import compare_enhancements
@@ -77,6 +78,16 @@ async def compare(file: UploadFile = File(...), user: User = Depends(get_current
         processing_time_ms=round(elapsed_ms, 2),
         fallback_reason=fallback_reason,
     )
-    db.add(ScanSession(user_id=user.id, enhancement_method=winner, mode="compare"))
+    session = ScanSession(user_id=user.id, enhancement_method=winner, mode="compare")
+    db.add(session)
     db.commit()
+    db.refresh(session)
+
+    _, winning_bytes = cv2.imencode(".png", clahe_output if winner == "clahe" else cnn_output)
+    original_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    winning_path = storage.upload_image(winning_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    session.image_path = original_path
+    session.enhanced_image_path = winning_path
+    db.commit()
+    
     return response
