@@ -5,7 +5,8 @@ from io import BytesIO
 from datetime import datetime
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
 from app.config import settings
 
@@ -30,6 +31,10 @@ class S3StorageService:
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
                 region_name=settings.AWS_REGION,
+                config=Config(
+                    signature_version="s3v4",
+                    s3={"addressing_style": "path"},
+                ),
             )
             self.bucket = settings.AWS_BUCKET_NAME
         else:
@@ -64,9 +69,9 @@ class S3StorageService:
             )
             logger.info(f"Uploaded image to S3: {key}")
             return key
-        except ClientError as e:
+        except (BotoCoreError, ClientError) as e:
             logger.error(f"Failed to upload image to S3: {e}")
-            return None
+            raise RuntimeError("Object storage upload failed") from e
 
     def get_signed_url(self, key: str, expiration: int = 3600) -> str | None:
         """
@@ -89,7 +94,7 @@ class S3StorageService:
                 ExpiresIn=expiration,
             )
             return url
-        except ClientError as e:
+        except (BotoCoreError, ClientError) as e:
             logger.error(f"Failed to generate signed URL for {key}: {e}")
             return None
 
@@ -102,7 +107,7 @@ class S3StorageService:
             self.client.delete_object(Bucket=self.bucket, Key=key)
             logger.info(f"Deleted image from S3: {key}")
             return True
-        except ClientError as e:
+        except (BotoCoreError, ClientError) as e:
             logger.error(f"Failed to delete image from S3: {e}")
             return False
 

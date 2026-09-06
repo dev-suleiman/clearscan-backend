@@ -4,7 +4,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -41,7 +41,7 @@ def _decode_upload(file: UploadFile, contents: bytes) -> np.ndarray:
 
 
 @router.post("/enhance/clahe", response_model=EnhancementResponse)
-async def enhance_clahe_endpoint(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def enhance_clahe_endpoint(file: UploadFile = File(...), session_id: int | None = Query(None), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     image = _decode_upload(file, contents)
     start = time.perf_counter()
@@ -61,13 +61,17 @@ async def enhance_clahe_endpoint(file: UploadFile = File(...), user: User = Depe
         ),
         processing_time_ms=round(elapsed_ms, 2),
     )
-    session = ScanSession(user_id=user.id, enhancement_method="clahe", mode="offline")
-    db.add(session)
+    session = db.get(ScanSession, session_id) if session_id else None
+    if session and session.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not own this session")
+    if session is None:
+        session = ScanSession(user_id=user.id)
+        db.add(session)
     db.commit()
     db.refresh(session)
 
     _, enhanced_bytes = cv2.imencode(".png", enhanced)
-    original_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
     enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
     session.image_path = original_path
     session.enhanced_image_path = enhanced_path
@@ -83,7 +87,7 @@ async def enhance_clahe_endpoint(file: UploadFile = File(...), user: User = Depe
 
 
 @router.post("/enhance/cnn", response_model=EnhancementResponse)
-async def enhance_cnn_endpoint(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def enhance_cnn_endpoint(file: UploadFile = File(...), session_id: int | None = Query(None), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     image = _decode_upload(file, contents)
     start = time.perf_counter()
@@ -111,13 +115,17 @@ async def enhance_cnn_endpoint(file: UploadFile = File(...), user: User = Depend
         ),
         processing_time_ms=round(elapsed_ms, 2),
     )
-    session = ScanSession(user_id=user.id, enhancement_method="cnn", mode="cnn")
-    db.add(session)
+    session = db.get(ScanSession, session_id) if session_id else None
+    if session and session.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not own this session")
+    if session is None:
+        session = ScanSession(user_id=user.id)
+        db.add(session)
     db.commit()
     db.refresh(session)
 
     _, enhanced_bytes = cv2.imencode(".png", enhanced)
-    original_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
     enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
     session.image_path = original_path
     session.enhanced_image_path = enhanced_path

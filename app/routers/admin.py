@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_admin
 from app.database import ScanSession, User, get_db
 from app.routers.auth import profile
+from app.storage import storage
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -26,7 +27,9 @@ def user_history(user_id: int, _: User = Depends(require_admin), db: Session = D
         raise HTTPException(status_code=404, detail="User not found")
     return [{"id": item.id, "user_id": item.user_id, "quality_class": item.quality_class,
              "enhancement_method": item.enhancement_method, "mode": item.mode,
-             "created_at": item.created_at.isoformat()}
+             "created_at": item.created_at.isoformat(),
+             "original_image_url": storage.get_signed_url(item.image_path) if item.image_path else None,
+             "enhanced_image_url": storage.get_signed_url(item.enhanced_image_path) if item.enhanced_image_path else None}
             for item in db.query(ScanSession).filter(ScanSession.user_id == user_id)
             .order_by(ScanSession.created_at.desc()).all()]
 

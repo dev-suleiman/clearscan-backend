@@ -4,7 +4,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -39,7 +39,7 @@ def _decode_upload(file: UploadFile, contents: bytes) -> np.ndarray:
     return image
 
 @router.post("/compare", response_model=ComparisonResponse)
-async def compare(file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def compare(file: UploadFile = File(...), session_id: int | None = Query(None), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     contents = await file.read()
     image = _decode_upload(file, contents)
     start = time.perf_counter()
@@ -78,13 +78,19 @@ async def compare(file: UploadFile = File(...), user: User = Depends(get_current
         processing_time_ms=round(elapsed_ms, 2),
         fallback_reason=fallback_reason,
     )
-    session = ScanSession(user_id=user.id, enhancement_method=winner, mode="compare")
-    db.add(session)
+    session = db.get(ScanSession, session_id) if session_id else None
+    if session and session.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not own this session")
+    if session is None:
+        session = ScanSession(user_id=user.id)
+        db.add(session)
+    session.enhancement_method = winner
+    session.mode = "compare"
     db.commit()
     db.refresh(session)
 
     _, winning_bytes = cv2.imencode(".png", clahe_output if winner == "clahe" else cnn_output)
-    original_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
     winning_path = storage.upload_image(winning_bytes.tobytes(), user.id, session.id, image_type="enhanced")
     session.image_path = original_path
     session.enhanced_image_path = winning_path
