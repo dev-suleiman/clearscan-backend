@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +21,20 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-2"
     AWS_BUCKET_NAME: str = "assets"
     S3_ENABLED: bool = False
+
+    @field_validator(
+        "AWS_ENDPOINT_URL_S3",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_REGION",
+        "AWS_BUCKET_NAME",
+        mode="before",
+    )
+    @classmethod
+    def clean_s3_setting(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        return value.strip().strip('"').strip("'").strip()
 
     @property
     def cors_origins_list(self) -> list[str]:

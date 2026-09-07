@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.auth import get_current_user
 from app.database import ScanSession, User, get_db
-from app.storage import storage
+from app.storage import ObjectStorageError, storage
 from app.models.classifier import classifier
 from app.processing.metrics import compute_metrics, image_quality_to_metrics_dict
 from app.schemas.responses import QualityAssessmentResponse
@@ -79,7 +79,11 @@ async def assess(file: UploadFile = File(...), user: User = Depends(get_current_
     db.commit()
     db.refresh(session)
 
-    image_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    try:
+        image_path = storage.upload_image(contents, user.id, session.id, image_type="original")
+    except ObjectStorageError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Image storage is temporarily unavailable. Please try again.") from exc
     session.image_path = image_path
     db.commit()
 

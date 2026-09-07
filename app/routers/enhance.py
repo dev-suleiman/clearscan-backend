@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.auth import get_current_user
 from app.database import ScanSession, User, get_db
-from app.storage import storage
+from app.storage import ObjectStorageError, storage
 from app.models.enhancer import enhancer
 from app.processing.clahe import enhance_clahe, image_to_base64
 from app.processing.comparison import reference_metrics
@@ -71,8 +71,12 @@ async def enhance_clahe_endpoint(file: UploadFile = File(...), session_id: int |
     db.refresh(session)
 
     _, enhanced_bytes = cv2.imencode(".png", enhanced)
-    original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
-    enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    try:
+        original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
+        enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    except ObjectStorageError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Image storage is temporarily unavailable. Please try again.") from exc
     session.image_path = original_path
     session.enhanced_image_path = enhanced_path
     db.commit()
@@ -125,8 +129,12 @@ async def enhance_cnn_endpoint(file: UploadFile = File(...), session_id: int | N
     db.refresh(session)
 
     _, enhanced_bytes = cv2.imencode(".png", enhanced)
-    original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
-    enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    try:
+        original_path = session.image_path or storage.upload_image(contents, user.id, session.id, image_type="original")
+        enhanced_path = storage.upload_image(enhanced_bytes.tobytes(), user.id, session.id, image_type="enhanced")
+    except ObjectStorageError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Image storage is temporarily unavailable. Please try again.") from exc
     session.image_path = original_path
     session.enhanced_image_path = enhanced_path
     db.commit()

@@ -13,6 +13,10 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+class ObjectStorageError(RuntimeError):
+    """Raised when the configured object storage rejects an operation."""
+
+
 class S3StorageService:
     """Handles image storage and retrieval with Neon S3-compatible storage."""
 
@@ -73,8 +77,9 @@ class S3StorageService:
             logger.info(f"Uploaded image to S3: {key}")
             return key
         except (BotoCoreError, ClientError) as e:
-            logger.error(f"Failed to upload image to S3: {e}")
-            raise RuntimeError("Object storage upload failed") from e
+            error_code = e.response.get("Error", {}).get("Code", "unknown") if isinstance(e, ClientError) else type(e).__name__
+            logger.error("Failed to upload image to S3: code=%s bucket=%s", error_code, self.bucket)
+            raise ObjectStorageError(f"Object storage upload failed: {error_code}") from e
 
     def get_signed_url(self, key: str, expiration: int = 3600) -> str | None:
         """
