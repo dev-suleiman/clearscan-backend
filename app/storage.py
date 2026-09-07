@@ -17,29 +17,32 @@ class S3StorageService:
     """Handles image storage and retrieval with Neon S3-compatible storage."""
 
     def __init__(self):
-        self.enabled = settings.S3_ENABLED and all(
-            [
-                settings.AWS_ENDPOINT_URL_S3,
-                settings.AWS_ACCESS_KEY_ID,
-                settings.AWS_SECRET_ACCESS_KEY,
-            ]
-        )
+        endpoint = self._clean_setting(settings.AWS_ENDPOINT_URL_S3)
+        access_key = self._clean_setting(settings.AWS_ACCESS_KEY_ID)
+        secret_key = self._clean_setting(settings.AWS_SECRET_ACCESS_KEY)
+        region = self._clean_setting(settings.AWS_REGION)
+        bucket = self._clean_setting(settings.AWS_BUCKET_NAME)
+        self.enabled = settings.S3_ENABLED and all([endpoint, access_key, secret_key, bucket])
         if self.enabled:
             self.client = boto3.client(
                 "s3",
-                endpoint_url=settings.AWS_ENDPOINT_URL_S3,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region_name=settings.AWS_REGION,
+                endpoint_url=endpoint,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
                 config=Config(
                     signature_version="s3v4",
                     s3={"addressing_style": "path"},
                 ),
             )
-            self.bucket = settings.AWS_BUCKET_NAME
+            self.bucket = bucket
         else:
             self.client = None
             self.bucket = None
+
+    @staticmethod
+    def _clean_setting(value: str) -> str:
+        return value.strip().strip('"').strip("'").strip()
 
     def upload_image(self, image_bytes: bytes, user_id: int, session_id: int, image_type: str = "original") -> str | None:
         """
